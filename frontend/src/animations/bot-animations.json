@@ -1,0 +1,46 @@
+{
+  "idle": {
+    "type": "pulse",
+    "duration": 2000,
+    "scale": [1, 1.05, 1],
+    "repeat": true,
+    "ease": "easeInOut"
+  },
+  "listening": {
+    "type": "wave",
+    "duration": 1500,
+    "repeat": true,
+    "ease": "easeInOut",
+    "description": "Gentle wave animation for listening state"
+  },
+  "thinking": {
+    "type": "rotate",
+    "duration": 1000,
+    "repeat": true,
+    "ease": "linear",
+    "description": "Continuous rotation for thinking state"
+  },
+  "typing": {
+    "type": "bounce",
+    "duration": 800,
+    "repeat": true,
+    "ease": "easeInOut",
+    "description": "Bounce animation while bot is typing"
+  },
+  "success": {
+    "type": "scale",
+    "duration": 500,
+    "scale": [1, 1.2, 1],
+    "repeat": false,
+    "ease": "easeOut",
+    "description": "Quick scale up and down for success feedback"
+  },
+  "error": {
+    "type": "shake",
+    "duration": 400,
+    "offset": [-5, 5, -5, 5, 0],
+    "repeat": false,
+    "ease": "easeInOut",
+    "description": "Shake animation for error state"
+  }
+}

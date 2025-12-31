@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+  }
+
+  * {
+    @apply border-slate-200;
+  }
+
+  body {
+    @apply bg-gradient-to-br from-slate-50 via-primary-50 to-surface-background text-slate-900 font-sans antialiased;
+    min-height: 100vh;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* Button Styles */
+  .btn {
+    @apply px-6 py-3 rounded-xl font-medium transition-all duration-200 ease-in-out;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary-600 to-primary-700 text-white;
+    @apply hover:from-primary-700 hover:to-primary-800 hover:shadow-glow;
+    @apply focus:ring-primary-500;
+    @apply active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-slate-700 border-2 border-slate-200;
+    @apply hover:bg-slate-50 hover:border-slate-300;
+    @apply focus:ring-slate-400;
+  }
+
+  .btn-danger {
+    @apply bg-red-500 text-white;
+    @apply hover:bg-red-600 hover:shadow-lg;
+    @apply focus:ring-red-400;
+  }
+
+  .btn-icon {
+    @apply p-2 rounded-lg transition-all duration-200;
+    @apply hover:bg-slate-100 active:scale-95;
+  }
+
+  /* Input Styles */
+  .input {
+    @apply w-full px-4 py-3 rounded-xl border-2 border-slate-200;
+    @apply bg-white text-slate-900 placeholder-slate-400;
+    @apply focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200;
+    @apply transition-all duration-200;
+  }
+
+  .input-error {
+    @apply border-red-400 focus:border-red-500 focus:ring-red-200;
+  }
+
+  /* Card Styles */
+  .card {
+    @apply bg-white rounded-2xl shadow-soft border border-slate-100;
+    @apply transition-all duration-200;
+  }
+
+  .card-hover {
+    @apply hover:shadow-lg hover:scale-[1.01];
+  }
+
+  /* Task Item Styles */
+  .task-item {
+    @apply flex items-center gap-4 p-4 rounded-xl;
+    @apply bg-white border-2 border-slate-100;
+    @apply transition-all duration-200;
+    @apply hover:border-primary-200 hover:shadow-soft;
+  }
+
+  .task-item-completed {
+    @apply bg-slate-50 border-slate-200;
+  }
+
+  /* Loading Skeleton */
+  .skeleton {
+    @apply animate-pulse bg-slate-200 rounded;
+  }
+
+  /* Empty State */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-16 px-4;
+    @apply text-center text-slate-500;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent;
+  }
+
+  .glass {
+    @apply bg-white/80 backdrop-blur-sm;
+  }
+}
