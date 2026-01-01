@@ -19,13 +19,24 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # AI Configuration
-    GEMINI_API_KEY: str = ""  # Phase III: AI Chatbot
+    # Gemini (Deprecated/Alternative)
+    GEMINI_API_KEY: str = "" 
+    GEMINI_MODEL: str = "gemini-2.0-flash-exp"
+    
+    # OpenRouter / OpenAI
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL: str = "meta-llama/llama-3.3-70b-instruct:free"
+    
+    # User specific aliases (found in .env)
+    OPEN_ROUTER: str = ""
+    BASE_URL: str = ""
     
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8-sig",
-        case_sensitive=True
+        case_sensitive=True,
+        extra="ignore"
     )
     
     @property

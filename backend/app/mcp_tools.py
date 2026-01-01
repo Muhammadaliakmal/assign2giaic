@@ -169,3 +169,107 @@ GEMINI_TOOLS = [
     delete_task,
     update_task
 ]
+
+# Tool definitions for OpenAI (OpenRouter)
+OPENAI_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "add_task",
+            "description": "Create a new task for the user.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "The title of the task."
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Optional description of the task."
+                    }
+                },
+                "required": ["title"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_tasks",
+            "description": "List all tasks, optionally filtered by completion status.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "completed": {
+                        "type": "boolean",
+                        "description": "Filter by completion status (true for completed, false for pending)."
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "complete_task",
+            "description": "Toggle task completion status (mark as complete or incomplete).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "integer",
+                        "description": "The ID of the task to complete/reopen."
+                    }
+                },
+                "required": ["task_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_task",
+            "description": "Delete a task permanently.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "integer",
+                        "description": "The ID of the task to delete."
+                    }
+                },
+                "required": ["task_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_task",
+            "description": "Update a task's details.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "integer",
+                        "description": "The ID of the task to update."
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "New title for the task."
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "New description for the task."
+                    },
+                    "completed": {
+                        "type": "boolean",
+                        "description": "New completion status."
+                    }
+                },
+                "required": ["task_id"]
+            }
+        }
+    }
+]

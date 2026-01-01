@@ -68,12 +68,13 @@ export default function ChatWindow({ userId, isOpen, onClose }: ChatWindowProps)
       
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to send message. Please try again.');
+      const errorMsg = err.response?.data?.detail || 'Failed to send message. Please try again.';
+      setError(errorMsg);
       
       // Add error message
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: errorMsg,
         created_at: new Date().toISOString()
       };
       

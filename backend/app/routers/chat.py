@@ -1,16 +1,16 @@
 """
-Chat Router - Phase III AI-Powered Todo Chatbot (Gemini Version)
+Chat Router - Phase III AI-Powered Todo Chatbot (OpenRouter/OpenAI Version)
 
-Handles chat endpoint with Google Gemini SDK integration and MCP tools.
+Handles chat endpoint with OpenRouter (OpenAI compatible) integration and MCP tools.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import json
 from datetime import datetime
-import google.generativeai as genai
-from google.generativeai.types import FunctionDeclaration, Tool
+from openai import AsyncOpenAI
+import os
 
 from app.models import (
     User, Conversation, Message,
@@ -19,13 +19,23 @@ from app.models import (
 from app.database import get_session
 from app.auth import get_current_user, verify_user_access
 from app.config import get_settings
-from app.mcp_tools import GEMINI_TOOLS, add_task, list_tasks, complete_task, delete_task, update_task
-
-
+from app.mcp_tools import (
+    OPENAI_TOOLS, 
+    add_task, list_tasks, complete_task, delete_task, update_task
+)
 
 from app.context import session_context, user_id_context
 
 router = APIRouter(prefix="/api", tags=["Chat"])
+
+# Map function names to actual callables
+AVAILABLE_TOOLS = {
+    "add_task": add_task,
+    "list_tasks": list_tasks,
+    "complete_task": complete_task,
+    "delete_task": delete_task,
+    "update_task": update_task
+}
 
 # System prompt for the AI assistant
 SYSTEM_PROMPT = """You are a helpful task management assistant. You help users manage their todo tasks through natural conversation.
@@ -38,36 +48,32 @@ Guidelines:
 - When listing tasks, format them nicely
 - For ambiguous requests, ask for clarification
 - Use emojis sparingly (✅ for success, 🗑️ for delete, ✏️ for edit)
-- If a user asks to create a task, extract the title and description from their message
+- If me (the user) asks you to create/delete/update a task, use the appropriate tool.
 - When showing tasks, present them in a clear, numbered list
 - If the tool execution was successful, just confirm it based on the tool output, don't repeat the technical details unless asked.
 
 Current Date/Time: {current_time}
 """
 
-
-def get_gemini_model():
-    """Configure and return Gemini model instance."""
+def get_openai_client():
+    """Configure and return OpenAI client instance pointing to OpenRouter."""
     settings = get_settings()
     
-    if not settings.GEMINI_API_KEY:
+    # Priority: OPENROUTER_API_KEY -> OPEN_ROUTER -> GEMINI_API_KEY
+    api_key = settings.OPENROUTER_API_KEY or settings.OPEN_ROUTER or settings.GEMINI_API_KEY
+    # Priority: OPENROUTER_BASE_URL -> BASE_URL -> Default
+    base_url = settings.OPENROUTER_BASE_URL or settings.BASE_URL or "https://openrouter.ai/api/v1"
+    
+    if not api_key:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Gemini API key not configured"
+            detail="AI API key not configured (OPENROUTER_API_KEY or OPEN_ROUTER)"
         )
-    
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-    
-    # Wrap tools in the Tool type to satisfy the SDK
-    from google.generativeai.types import Tool
-    tools_obj = Tool(function_declarations=GEMINI_TOOLS)
-    
-    return genai.GenerativeModel(
-        model_name='gemini-2.0-flash-exp',
-        tools=[tools_obj],
-        system_instruction=SYSTEM_PROMPT.format(current_time=datetime.now().isoformat())
+        
+    return AsyncOpenAI(
+        api_key=api_key,
+        base_url=base_url
     )
-
 
 @router.post("/{user_id}/chat", response_model=ChatResponse)
 async def chat(
@@ -77,7 +83,7 @@ async def chat(
     session: Session = Depends(get_session)
 ):
     """
-    Chat endpoint for AI-powered task management using Google Gemini.
+    Chat endpoint for AI-powered task management using OpenRouter/OpenAI.
     """
     verify_user_access(current_user, user_id)
     
@@ -86,6 +92,10 @@ async def chat(
     token_user_id = user_id_context.set(user_id)
     
     try:
+        settings = get_settings()
+        client = get_openai_client()
+        model_name = settings.OPENROUTER_MODEL
+
         # 1. Get or create conversation
         if request.conversation_id:
             conversation = session.get(Conversation, request.conversation_id)
@@ -107,96 +117,108 @@ async def chat(
         session.add(user_message_db)
         session.commit()
         
-        # 3. Build history for Gemini
-        # We start a fresh chat session populated with recent history to avoid complex state management issues
+        # 3. Build history for OpenAI
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT.format(current_time=datetime.now().isoformat())}
+        ]
+        
+        # Fetch recent history
         statement = select(Message).where(Message.conversation_id == conversation.id).order_by(Message.created_at)
         history_msgs = session.exec(statement).all()
         
-        gemini_history = []
         for msg in history_msgs:
-            if msg.id == user_message_db.id:
-                continue
-            
-            # Skip messages with no content (e.g. tool execution records from old version)
-            if not msg.content:
-                continue
-                
-            role = "user" if msg.role == "user" else "model"
-            gemini_history.append({"role": role, "parts": [msg.content]})
+            # We map DB roles to OpenAI roles. 
+            # Note: We skip complex tool call history reconstruction for simplicity 
+            # and just provide the text content to keep context.
+            if msg.content:
+                msg_role = "user" if msg.role == "user" else "assistant"
+                messages.append({"role": msg_role, "content": msg.content})
 
-        # Ensure history alternates correctly (if multiple users/models in a row, combine or drop)
-        # Simplified: If empty, start fresh. If ending with model, looks good.
-        # If the last message was user (from history rehydration), we might have issues if we send another user message?
-        # Actually start_chat() doesn't send the first message, it just sets context.
-        # When we call send_message(), that's the next User part.
-        # So history should ideally end with 'model'.
-        
-        # 4. Initialize Chat Session
-        model = get_gemini_model()
-        chat_session = model.start_chat(
-            history=gemini_history, 
-            enable_automatic_function_calling=True
+        # 4. First Call to LLM
+        response = await client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            tools=OPENAI_TOOLS,
+            tool_choice="auto"
         )
+        
+        response_message = response.choices[0].message
+        tool_calls = response_message.tool_calls
+        
+        final_content = response_message.content
+        tool_calls_info_list = []
 
-        try:
-            response = chat_session.send_message(request.message)
-        except Exception as e:
-            # Fallback for "Please ensure that multiturn requests alternate" or similar errors
-            # Retry with empty history if history was corrupted
-            print(f"Chat error with history: {e}. Retrying with empty history.")
-            chat_session = model.start_chat(history=[], enable_automatic_function_calling=True)
-            response = chat_session.send_message(request.message)
-        
-        # 5. Extract tool usage info from the LAST turn only
-        # The history includes [User, Model(ToolCall), Function(Result), Model(Response)]
-        # We need to find the tool calls associated with THIS response text.
-        
-        tool_calls_info = []
-        assistant_content = response.text
-        
-        # Iterate backwards through history to find the tool calls generated in this session
-        # Logic: Looking for 'model' parts with 'function_call'
-        # Since we just sent one message, any new items in history are from this turn.
-        new_history_start_index = len(gemini_history) + 1 # +1 for the user message we just sent? No, user msg is added to history.
-        # ChatHistory: [Old..., User(New), Model(Call), Function(Result), Model(Txt)]
-        
-        recent_history = chat_session.history[len(gemini_history):]
-        
-        for part in recent_history:
-             if part.role == 'model':
-                for p in part.parts:
-                    if p.function_call:
-                        tool_calls_info.append({
-                            "tool_name": p.function_call.name,
-                            "inputs": dict(p.function_call.args),
-                            "output": {"success": True, "message": "Executed"}
-                        })
-        
-        # 6. Save assistant message
+        # 5. Handle Tool Calls
+        if tool_calls:
+            # Append the assistant's message (with tool calls) to history
+            messages.append(response_message)
+            
+            # Execute each tool
+            for tool_call in tool_calls:
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments)
+                
+                function_to_call = AVAILABLE_TOOLS.get(function_name)
+                
+                if function_to_call:
+                    # Execute tool
+                    tool_result = function_to_call(**function_args)
+                    
+                    # Store info for response
+                    tool_calls_info_list.append({
+                        "tool_name": function_name,
+                        "inputs": function_args,
+                        "output": tool_result.to_dict()
+                    })
+                    
+                    # Add tool result to messages
+                    messages.append({
+                        "tool_call_id": tool_call.id,
+                        "role": "tool",
+                        "name": function_name,
+                        "content": json.dumps(tool_result.to_dict())
+                    })
+                else:
+                    # Handle unknown tool?
+                    messages.append({
+                        "tool_call_id": tool_call.id,
+                        "role": "tool",
+                        "name": function_name,
+                        "content": json.dumps({"error": f"Tool {function_name} not found"})
+                    })
+
+            # 6. Second Call to LLM (Get final response after tools)
+            second_response = await client.chat.completions.create(
+                model=model_name,
+                messages=messages
+            )
+            final_content = second_response.choices[0].message.content
+
+        # 7. Save assistant message
         assistant_msg = Message(
             conversation_id=conversation.id,
             role="assistant",
-            content=assistant_content,
-            tool_calls=json.dumps(tool_calls_info) if tool_calls_info else None
+            content=final_content,
+            tool_calls=json.dumps(tool_calls_info_list) if tool_calls_info_list else None
         )
         session.add(assistant_msg)
         session.commit()
         
         return ChatResponse(
             conversation_id=conversation.id,
-            response=assistant_content,
+            response=final_content or "",
             tool_calls=[
                 ToolCallInfo(
                     tool_name=tc["tool_name"],
                     inputs=tc["inputs"],
                     output=tc["output"]
-                ) for tc in tool_calls_info
+                ) for tc in tool_calls_info_list
             ]
         )
 
     except Exception as e:
         import traceback
-        traceback.print_exc() # Print full stack trace to console
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Chat error: {str(e)}"
