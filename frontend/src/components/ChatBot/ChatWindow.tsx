@@ -25,7 +25,7 @@ export default function ChatWindow({ userId, isOpen, onClose }: ChatWindowProps)
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: 'Hi! I\'m your task assistant. I can help you add, view, update, and manage your tasks. What would you like to do?',
+      content: 'Hi! I am your task assistant. I can help you add, view, update, and manage your tasks. What would you like to do?',
       created_at: new Date().toISOString()
     }
   ]);
@@ -37,7 +37,7 @@ export default function ChatWindow({ userId, isOpen, onClose }: ChatWindowProps)
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isLoading]);
 
   const handleSendMessage = async (content: string) => {
     // Add user message immediately
@@ -92,71 +92,88 @@ export default function ChatWindow({ userId, isOpen, onClose }: ChatWindowProps)
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed bottom-4 right-4 w-full max-w-md h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 md:max-w-md sm:bottom-0 sm:right-0 sm:rounded-none sm:h-full sm:max-w-full"
+          className="fixed bottom-6 right-6 w-full max-w-[400px] h-[600px] rounded-lg shadow-xl flex flex-col overflow-hidden z-50 md:max-w-md sm:bottom-0 sm:right-0 sm:rounded-none sm:h-full sm:max-w-full bg-white border border-gray-200"
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <BotAvatar state="idle" size={40} />
+          <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <BotAvatar state={isLoading ? 'thinking' : 'idle'} size={32} />
               <div>
-                <h3 className="font-semibold text-base">Task Assistant</h3>
-                <p className="text-xs text-purple-100">Always here to help</p>
+                <h3 className="font-semibold text-sm text-gray-800">Assistant</h3>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-colors"
               aria-label="Close chat"
             >
               <X size={20} />
             </button>
           </div>
 
-          {/* Quick Actions */}
-          <QuickActions onAction={handleQuickAction} disabled={isLoading} />
-
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50" role="log" aria-live="polite">
-            {messages.map((msg, index) => (
-              <MessageBubble
-                key={index}
-                role={msg.role}
-                content={msg.content}
-                timestamp={msg.created_at}
-                isLatest={index === messages.length - 1 && msg.role === 'assistant' && isLoading}
-              />
-            ))}
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent" role="log" aria-live="polite">
+            <AnimatePresence initial={false}>
+              {messages.map((msg, index) => (
+                <MessageBubble
+                  key={index}
+                  role={msg.role}
+                  content={msg.content || ''}
+                  timestamp={msg.created_at}
+                  isLatest={index === messages.length - 1 && msg.role === 'assistant' && isLoading}
+                />
+              ))}
+            </AnimatePresence>
             
             {/* Loading indicator */}
             {isLoading && (
-              <div className="flex gap-3 mb-4">
-                <BotAvatar state="typing" size={40} />
-                <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                  </div>
+              <motion.div 
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex gap-3"
+              >
+                <div className="flex-shrink-0 mt-1">
+                  <BotAvatar state="typing" size={24} />
                 </div>
-              </div>
+                <div className="text-gray-400 text-sm flex items-center gap-1">
+                  <span className="animate-pulse">Thinking...</span>
+                </div>
+              </motion.div>
             )}
             
             {/* Error message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="bg-red-50 border border-red-100 rounded-md px-3 py-2 text-xs text-red-600 flex items-center gap-2"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                {error}
+              </motion.div>
             )}
             
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Composer */}
-          <Composer onSend={handleSendMessage} disabled={isLoading} />
+          {/* Quick Actions & Composer */}
+          <div className="bg-white border-t border-gray-100 p-4">
+             {/* Quick Actions - Only show if no messages or just welcome message */}
+            {messages.length <= 2 && (
+               <div className="mb-3">
+                  <QuickActions onAction={handleQuickAction} disabled={isLoading} />
+               </div>
+            )}
+            <Composer onSend={handleSendMessage} disabled={isLoading} />
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.database import create_db_and_tables
-from app.routers import auth, tasks, chat
+from app.routers import auth, tasks, chat, chatkit, agent
 
 
 @asynccontextmanager
@@ -25,8 +25,8 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI application
 app = FastAPI(
-    title="Phase III Task Manager API with AI Chatbot",
-    description="RESTful API for task management with JWT authentication and AI-powered chatbot",
+    title="Phase III Task Manager API with AI Chatbot & Chat Kit",
+    description="RESTful API for task management with JWT authentication, AI-powered chatbot, and chat kit configuration",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -44,15 +44,18 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(tasks.router)
 app.include_router(chat.router)  # Phase III: AI Chatbot
+app.include_router(chatkit.router)  # Chat Kit Configuration
+app.include_router(agent.router)  # Agent SDK Configuration
 
 
 @app.get("/")
 async def root():
     """Root endpoint."""
     return {
-        "message": "Phase III Task Manager API with AI Chatbot",
+        "message": "Phase III Task Manager API with AI Chatbot & Chat Kit",
         "version": "2.0.0",
-        "status": "running"
+        "status": "running",
+        "features": ["tasks", "auth", "ai_chat", "chat_kit", "agent_sdk"]
     }
 
 

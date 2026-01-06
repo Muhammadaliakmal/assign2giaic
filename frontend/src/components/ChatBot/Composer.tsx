@@ -1,13 +1,6 @@
-/**
- * Composer Component
- * 
- * Message input with send button and keyboard shortcuts.
- */
-
-'use client';
-
 import React, { useState, useRef, KeyboardEvent } from 'react';
-import { Send } from 'lucide-react';
+import { Send, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface ComposerProps {
   onSend: (message: string) => void;
@@ -18,9 +11,10 @@ interface ComposerProps {
 export default function Composer({ 
   onSend, 
   disabled = false, 
-  placeholder = 'Type a message...' 
+  placeholder = 'Message Task Assistant...' 
 }: ComposerProps) {
   const [message, setMessage] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = () => {
@@ -54,34 +48,45 @@ export default function Composer({
   };
 
   return (
-    <div className="border-t border-gray-200 bg-white p-4">
-      <div className="flex items-end gap-2">
+    <div className="relative">
+      <div 
+        className={`flex items-end gap-2 bg-white rounded-xl border transition-all duration-200 px-3 py-2 ${
+          isFocused ? 'border-gray-400 shadow-sm' : 'border-gray-300'
+        }`}
+      >
         <textarea
           ref={textareaRef}
           value={message}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed max-h-[120px] overflow-y-auto"
+          className="flex-1 resize-none bg-transparent px-1 py-1 text-sm focus:outline-none text-gray-800 placeholder:text-gray-400 disabled:opacity-50 max-h-[120px] overflow-y-auto w-full"
           aria-label="Message input"
         />
         
         <button
           onClick={handleSend}
           disabled={disabled || !message.trim()}
-          className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-center hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+          className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+            message.trim() && !disabled
+              ? 'bg-black text-white hover:bg-gray-800' 
+              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+          }`}
           aria-label="Send message"
         >
-          <Send size={18} />
+          {message.trim() ? <Send size={14} /> : <Sparkles size={14} className="text-gray-400" />}
         </button>
       </div>
       
-      <p className="text-xs text-gray-500 mt-2 px-1">
-        Press <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs">Enter</kbd> to send, 
-        <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs ml-1">Shift+Enter</kbd> for new line
-      </p>
+      <div className="text-center mt-2">
+        <p className="text-[10px] text-gray-400">
+          AI can make mistakes. Please check important info.
+        </p>
+      </div>
     </div>
   );
 }

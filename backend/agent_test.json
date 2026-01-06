@@ -1,0 +1,87 @@
+{
+    "prompt_type": "agent_sdk_initialization",
+    "spec_version": "1.0.0",
+    "agent": {
+        "id": "openai-agent-core",
+        "display_name": "OpenAI Core Agent",
+        "provider": "openai",
+        "model_policy": {
+            "default_model": "gpt-4.1",
+            "fallback_models": [
+                "gpt-4.1-mini"
+            ],
+            "temperature": 0.7,
+            "max_tokens": 4096
+        }
+    },
+    "integration": {
+        "target": "builtin_chatbot",
+        "mode": "embedded",
+        "lifecycle": {
+            "auto_start": true,
+            "graceful_shutdown": true,
+            "hot_reload": false
+        }
+    },
+    "capabilities": {
+        "conversation": {
+            "enabled": true,
+            "memory": {
+                "type": "contextual",
+                "window_size": 10,
+                "persist": false
+            }
+        },
+        "reasoning": {
+            "enabled": true,
+            "strategy": "chain_of_thought_guarded"
+        },
+        "tools": {
+            "enabled": true,
+            "tool_selection": "auto"
+        }
+    },
+    "security": {
+        "authentication": {
+            "method": "api_key",
+            "key_source": "environment"
+        },
+        "permissions": {
+            "allow_external_calls": false,
+            "allow_code_execution": false
+        },
+        "data_handling": {
+            "log_user_input": false,
+            "log_model_output": true,
+            "pii_redaction": true
+        }
+    },
+    "observability": {
+        "logging": {
+            "level": "info",
+            "structured": true
+        },
+        "metrics": {
+            "enabled": true,
+            "capture_latency": true,
+            "capture_tokens": true
+        },
+        "tracing": {
+            "enabled": false
+        }
+    },
+    "failover": {
+        "on_timeout": "retry",
+        "on_rate_limit": "fallback_model",
+        "max_retries": 2
+    },
+    "compliance": {
+        "safety_mode": "standard",
+        "content_filtering": true,
+        "region_restrictions": []
+    },
+    "activation": {
+        "status": "enabled",
+        "activation_time": "immediate"
+    }
+}

@@ -1,0 +1,51 @@
+{
+  "action": "register_chat_kit",
+  "version": "1.0.0",
+  "environment": "production",
+  "chatbot": {
+    "id": "builtin-chatbot",
+    "name": "Built-in Assistant",
+    "type": "system"
+  },
+  "chat_kit": {
+    "id": "default-chat-kit",
+    "name": "Core Chat Kit",
+    "provider": "internal",
+    "enabled": true,
+    "capabilities": {
+      "text_chat": true,
+      "context_memory": true,
+      "rich_responses": true,
+      "streaming": false,
+      "attachments": {
+        "images": true,
+        "files": false
+      }
+    },
+    "ui": {
+      "theme": "auto",
+      "position": "bottom-right",
+      "launcher": {
+        "visible": true,
+        "icon": "chat"
+      }
+    },
+    "limits": {
+      "max_message_length": 4000,
+      "rate_limit_per_minute": 60
+    }
+  },
+  "security": {
+    "auth_required": true,
+    "auth_type": "jwt",
+    "scopes": [
+      "chat:read",
+      "chat:write"
+    ]
+  },
+  "telemetry": {
+    "logging": true,
+    "metrics": true,
+    "trace_level": "info"
+  }
+}

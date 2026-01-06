@@ -11,10 +11,12 @@ import json
 from datetime import datetime
 from openai import AsyncOpenAI
 import os
+import time
 
 from app.models import (
     User, Conversation, Message,
-    ChatRequest, ChatResponse, ToolCallInfo
+    ChatRequest, ChatResponse, ToolCallInfo,
+    AgentConfig
 )
 from app.database import get_session
 from app.auth import get_current_user, verify_user_access
@@ -75,6 +77,19 @@ def get_openai_client():
         base_url=base_url
     )
 
+def get_agent_config(session: Session) -> Optional[Dict]:
+    """Get active agent configuration."""
+    statement = select(AgentConfig).where(AgentConfig.status == "enabled").limit(1)
+    agent = session.exec(statement).first()
+    if agent:
+        return {
+            "model_policy": json.loads(agent.model_policy),
+            "capabilities": json.loads(agent.capabilities),
+            "observability": json.loads(agent.observability),
+            "failover": json.loads(agent.failover)
+        }
+    return None
+
 @router.post("/{user_id}/chat", response_model=ChatResponse)
 async def chat(
     user_id: int,
@@ -94,7 +109,26 @@ async def chat(
     try:
         settings = get_settings()
         client = get_openai_client()
-        model_name = settings.OPENROUTER_MODEL
+        
+        # Load agent configuration
+        agent_config = get_agent_config(session)
+        if agent_config:
+            model_policy = agent_config["model_policy"]
+            model_name = model_policy.get("default_model", settings.OPENROUTER_MODEL)
+            fallback_models = model_policy.get("fallback_models", [])
+            temperature = model_policy.get("temperature", 0.7)
+            max_tokens = model_policy.get("max_tokens", 4096)
+            memory_window = agent_config["capabilities"]["conversation"]["memory"]["window_size"]
+            max_retries = agent_config["failover"]["max_retries"]
+            capture_metrics = agent_config["observability"]["metrics"]["enabled"]
+        else:
+            model_name = settings.OPENROUTER_MODEL
+            fallback_models = []
+            temperature = 0.7
+            max_tokens = 4096
+            memory_window = None
+            max_retries = 2
+            capture_metrics = False
 
         # 1. Get or create conversation
         if request.conversation_id:
@@ -122,9 +156,13 @@ async def chat(
             {"role": "system", "content": SYSTEM_PROMPT.format(current_time=datetime.now().isoformat())}
         ]
         
-        # Fetch recent history
+        # Fetch recent history (apply memory window if configured)
         statement = select(Message).where(Message.conversation_id == conversation.id).order_by(Message.created_at)
         history_msgs = session.exec(statement).all()
+        
+        # Apply memory window (limit to last N messages)
+        if memory_window and len(history_msgs) > memory_window:
+            history_msgs = history_msgs[-memory_window:]
         
         for msg in history_msgs:
             # We map DB roles to OpenAI roles. 
@@ -134,13 +172,35 @@ async def chat(
                 msg_role = "user" if msg.role == "user" else "assistant"
                 messages.append({"role": msg_role, "content": msg.content})
 
-        # 4. First Call to LLM
-        response = await client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            tools=OPENAI_TOOLS,
-            tool_choice="auto"
-        )
+        # 4. First Call to LLM (with retry and fallback)
+        start_time = time.time() if capture_metrics else None
+        
+        models_to_try = [model_name] + fallback_models
+        response = None
+        last_error = None
+        
+        for attempt, current_model in enumerate(models_to_try):
+            try:
+                response = await client.chat.completions.create(
+                    model=current_model,
+                    messages=messages,
+                    tools=OPENAI_TOOLS,
+                    tool_choice="auto",
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                break  # Success
+            except Exception as e:
+                last_error = e
+                if attempt < len(models_to_try) - 1:
+                    continue  # Try next model
+                else:
+                    raise  # No more models to try
+        
+        if capture_metrics and start_time:
+            latency = time.time() - start_time
+            tokens_used = response.usage.total_tokens if response and hasattr(response, 'usage') else 0
+            print(f"[METRICS] Latency: {latency:.2f}s, Tokens: {tokens_used}, Model: {current_model}")
         
         response_message = response.choices[0].message
         tool_calls = response_message.tool_calls
